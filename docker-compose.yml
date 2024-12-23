@@ -1,0 +1,71 @@
+x-env-project: &project-env
+  COMPOSE_PROJECT_NAME: ${COMPOSE_PROJECT_NAME}
+
+x-env-db-basic: &db-env
+  <<: *project-env
+  POSTGRES_PORT: ${POSTGRES_PORT}
+  POSTGRES_DBNAME: ${POSTGRES_DBNAME}
+  POSTGRES_USER: ${POSTGRES_USER}
+  POSTGRES_PASS: ${POSTGRES_PASS}
+  POSTGRES_HOST: ${POSTGRES_HOST}
+
+x-env-django: &django-env
+  <<: *db-env
+  PYTHONUNBUFFERED: ${PYTHONUNBUFFERED}
+  PYTHONDONTWRITEBYTECODE: ${PYTHONDONTWRITEBYTECODE}
+  ALLOWED_HOSTS: ${ALLOWED_HOSTS}
+  SECRET_KEY: ${SECRET_KEY}
+  USER: ${USER}
+  GROUP: ${GROUP}
+  USER_ID: ${USER_ID}
+  GROUP_ID: ${GROUP_ID}
+
+services:
+  #Django backend
+  backend:
+    user: ${USER_ID}:${GROUP_ID}
+    environment:
+      <<: *django-env
+    container_name: wtt
+    restart: always
+    command:
+      - bash
+      - -c
+      - |
+        python manage.py collectstatic --noinput
+        ${BACKEND_RUN_SRVR_COMMAND}
+    build:
+      context: ./wtt
+      dockerfile: Dockerfile
+      args:
+        USER_ID: ${USER_ID}
+        GROUP_ID: ${GROUP_ID}
+        USER: ${USER}
+        GROUP: ${GROUP}
+    hostname: wtt
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./wtt:/wtt
+      - ./static:/static
+      - ./logs/backend:/logs
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: kartoza/postgis:16-3.4
+    hostname: ${POSTGRES_HOST}
+    volumes:
+      - $HOME/wtt-database/:/var/lib/postgresql
+      - ./scripts/setup-pg_hba_for_dev.sh:/scripts/setup-pg_hba.sh
+    environment:
+      <<: *db-env
+    ports:
+      - ${POSTGRES_PORT}:${POSTGRES_PORT}
+    restart: always
+    healthcheck:
+      test: "pg_isready -h ${POSTGRES_DBNAME} -p ${POSTGRES_PORT} -U ${POSTGRES_USER} -d ${POSTGRES_DBNAME} -t 5"
+      interval: 30s
+      timeout: 10s
+      retries: 5
