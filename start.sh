@@ -30,7 +30,7 @@ if [ ! -d "./static/admin" ]; then
     mkdir -p ./static/rest_framework
 fi
 
-export BACKEND_RUN_SRVR_COMMAND="uvicorn config.asgi:application --host 0.0.0.0 --port 8000"
+export BACKEND_RUN_SRVR_COMMAND="uvicorn config.asgi:application --host 0.0.0.0 --port 8000 --workers $WORKERS_COUNT"
 
 docker compose -f docker-compose.yml -p wtt up
 

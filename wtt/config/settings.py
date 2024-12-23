@@ -1,5 +1,7 @@
 import os
 from pathlib import Path
+from django.conf.global_settings import LANGUAGES
+
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -87,6 +89,9 @@ AUTH_PASSWORD_VALIDATORS = [
 
 
 LANGUAGE_CODE = 'en-us'
+LOCALE_PATHS = os.path.join(BASE_DIR, "locale"),
+
+LANGUAGES = [language_info for language_info in LANGUAGES if language_info[0] in ('ru', 'en')]
 
 TIME_ZONE = 'UTC'
 USE_I18N = True
@@ -97,3 +102,5 @@ STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'static'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+AUTH_USER_MODEL = "core.User"
