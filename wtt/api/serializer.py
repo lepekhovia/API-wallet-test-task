@@ -1,5 +1,3 @@
-from random import choice
-
 from rest_framework import serializers
 
 from core.models import Wallet
