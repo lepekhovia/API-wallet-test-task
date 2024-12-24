@@ -60,6 +60,10 @@ TEMPLATES = [
 
 ASGI_APPLICATION = 'config.asgi.application'
 
+if not all([os.environ.get("POSTGRES_DBNAME"), os.environ.get("POSTGRES_USER"), os.environ.get("POSTGRES_PASS"),
+            os.environ.get("POSTGRES_HOST"), os.environ.get("POSTGRES_PORT")]):
+    raise Exception("Postgres environment variables not set")
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",

@@ -1,9 +1,10 @@
 from asgiref.sync import sync_to_async
-from django.db import transaction
+from django.db import transaction, DatabaseError
 from rest_framework import status
 from rest_framework.generics import GenericAPIView
 from rest_framework.mixins import RetrieveModelMixin
 from rest_framework.response import Response
+from tenacity import retry, stop_after_attempt, wait_fixed
 
 from core.models import Wallet
 from ..serializer import WalletSerializer, WalletSerializerForPatch
@@ -11,38 +12,36 @@ from ..permissions import IsOwner
 
 
 class WalletOperationView(GenericAPIView):
-    serializer_class = WalletSerializer
-    serializer_class_for_patch = WalletSerializerForPatch
+    serializer_class = WalletSerializerForPatch
     permission_classes = [IsOwner]
 
-    def get_serializer_class(self):
-        if self.request.method == 'PATCH':
-            return self.serializer_class_for_patch
-        return self.serializer_class
+    @retry(stop=stop_after_attempt(5), wait=wait_fixed(0.1))
+    async def handle_transaction(self, wallet_uuid: str, data: dict) -> dict:
+        async with transaction.atomic():
+            wallet = await Wallet.objects.select_for_update().aget(id=wallet_uuid)
 
-    async def post(self, request, wallet_uuid: str):
+            if data['operationType'] == Wallet.WITHDRAW and wallet.balance < data['amount']:
+                return {"error": "Insufficient funds.", "status": status.HTTP_403_FORBIDDEN}
+
+            await wallet.change_balance(data['amount'], data['operationType'])
+
+            return {"status": "success", "balance": wallet.balance, "status_code": status.HTTP_200_OK}
+
+    async def post(self, request, wallet_uuid: str) -> Response:
         serializer = await sync_to_async(self.get_serializer)(data=request.data)
         if not await sync_to_async(serializer.is_valid)():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         data = serializer.validated_data
         try:
-            with transaction.atomic():
-                try:
-                    wallet = await Wallet.objects.select_for_update().aget(id=wallet_uuid)
-                except Wallet.DoesNotExist:
-                    transaction.rollback()
-                    return Response({"error": "Wallet not found."}, status=status.HTTP_404_NOT_FOUND)
-                if data['operationType'] == Wallet.WITHDRAW and wallet.balance < data['amount']:
-                    transaction.rollback()
-                    return Response({"error": "Insufficient funds."}, status=status.HTTP_403_FORBIDDEN)
-                await wallet.change_balance(data['amount'], data['operationType'])
-
+            result = await self.handle_transaction(wallet_uuid, data)
+            if "error" in result:
+                return Response({"error": result["error"]}, status=result["status"])
+            return Response({"status": result["status"], "balance": result["balance"]}, status=result["status_code"])
+        except DatabaseError:
+            return Response({"error": "Internal error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         except Exception:
-            # TODO: подключить редис и отправлять сообщение в очередь
-            return Response({"error": "Error processing transaction."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        return Response({"status": "success", "balance": wallet.balance}, status=status.HTTP_200_OK)
+            return Response({"error": "Internal error."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class BalanceView(GenericAPIView, RetrieveModelMixin):
