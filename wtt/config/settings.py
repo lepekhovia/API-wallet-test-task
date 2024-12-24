@@ -10,7 +10,7 @@ SECRET_KEY = os.environ.get('SECRET_KEY')
 if not SECRET_KEY:
     raise ValueError("SECRET_KEY environment variable is not set")
 
-DEBUG = True  # os.environ.get("DEBUG", "False").lower() == "true"
+DEBUG = True
 
 ALLOWED_HOSTS = [os.environ.get("ALLOWED_HOSTS", "0.0.0.0")]
 # ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS").split(", ")
@@ -99,8 +99,20 @@ USE_L10N = True
 USE_TZ = True
 
 STATIC_URL = 'static/'
-STATIC_ROOT = BASE_DIR / 'static'
+STATIC_ROOT = '/static'
+STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 AUTH_USER_MODEL = "core.User"
+ACTIVATE_JWT = True
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.TokenAuthentication',
+    ),
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.IsAuthenticated',
+    ),
+}

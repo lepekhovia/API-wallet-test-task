@@ -19,10 +19,11 @@ x-env-django: &django-env
   GROUP: ${GROUP}
   USER_ID: ${USER_ID}
   GROUP_ID: ${GROUP_ID}
+  DEBUG: ${DEBUG}
 
 services:
   #Django backend
-  backend:
+  wtt:
     user: ${USER_ID}:${GROUP_ID}
     environment:
       <<: *django-env
@@ -56,6 +57,7 @@ services:
   db:
     image: kartoza/postgis:16-3.4
     hostname: ${POSTGRES_HOST}
+    container_name: wtt-db
     volumes:
       - $HOME/wtt-database/:/var/lib/postgresql
       - ./scripts/setup-pg_hba_for_dev.sh:/scripts/setup-pg_hba.sh
